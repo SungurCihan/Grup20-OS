@@ -1,0 +1,174 @@
+package Core.Dispatcher;
+import java.io.IOException;
+import java.util.Timer;
+import java.util.TimerTask;
+
+import Core.Queue.QueuePool;
+import Core.Utilities.Priority;
+import Core.Utilities.State;
+import Core.Process.ProceessInterruptedModel;
+import Core.Process.Process;
+
+public class Dispatcher extends TimerTask {
+	//Zamanlayýcý deðiþkenleri
+	private static Timer Timer;
+	private int timerCounter=0;
+	@Override
+	public void run() {
+		System.out.println("Saniye  = "+timerCounter);
+		CheckInterrupted(); //Zaman aþýmýna uðrayan proses olup olmadýðý kontrol ediliyor.
+		ClearTerminated();	//Zaman aþýmýna uðradýðý için "TERMINATED" durumuna çekilmiþ lakin kuyruktan sillinmemiþ proses varsa kuyruktan siliniyor.
+		LoopingQueues();	//Bütün kuyruklar dönülerek o saniye içerisinde varan proseslerin durumu "READY" olarak deðiþtiriliyor.
+		timerCounter++;
+		
+		if(QueuePool.RunningProcess!=null) 
+		{
+			try {
+				QueuePool.RunningProcess.Run(timerCounter);
+			} catch (IOException e) {
+				// TODO Auto-generated catch block
+				e.printStackTrace();
+			}
+		}
+		if(QueuePool.CheckIfSchedulerEnded())
+			{
+			System.out.println("Gorevlendirici vazifesini laigiyla ifa etmek hususunda kiymet-i harbiyesi ala bir muvaffakiyet sagladi");
+			Timer.cancel();
+			}
+	}
+	
+	
+	public static void StartTimer() {
+		System.out.println("Sayac Baslatildi.\n");
+
+		Timer = new Timer();
+		TimerTask task = new Dispatcher();
+		Timer.schedule(task,0,1000);
+	}
+	
+	
+	private void LoopingQueues() {
+		
+		if(QueuePool.getRealTimeQueue().getSize() != 0)
+		{
+			for(int i = QueuePool.getRealTimeQueue().first;i <= QueuePool.getRealTimeQueue().last;i++)
+			{	
+				Process currentProcess=QueuePool.getRealTimeQueue().getProcess(i);
+				Process nextProcess=QueuePool.getRealTimeQueue().getProcess(i+1);
+
+				if(currentProcess.ArrivalTime == timerCounter)
+				{
+					currentProcess.ChangeState(State.READY);
+					
+					if(QueuePool.RunningProcess==null||QueuePool.RunningProcess.Priority!=Priority.P0) QueuePool.RunningProcess=currentProcess;
+					
+					if(nextProcess!=null&&nextProcess.ArrivalTime!=timerCounter) //OPTIMIZASYON
+						break;
+				}
+			}
+		}
+		if(QueuePool.getUserBasedQueue1().getSize() != 0)
+		{
+			for(int i = QueuePool.getUserBasedQueue1().first;i <= QueuePool.getUserBasedQueue1().last;i++)
+			{	
+				Process currentProcess=QueuePool.getUserBasedQueue1().getProcess(i);
+				Process nextProcess=QueuePool.getUserBasedQueue1().getProcess(i+1);
+
+				if(currentProcess.ArrivalTime == timerCounter)
+				{
+					currentProcess.ChangeState(State.READY);
+					if(QueuePool.RunningProcess==null||QueuePool.RunningProcess.Priority==Priority.P2
+							||QueuePool.RunningProcess.Priority==Priority.P3) QueuePool.RunningProcess=currentProcess;
+					
+					if(nextProcess!=null&&nextProcess.ArrivalTime!=timerCounter)
+						break;
+				}
+			}
+		}
+		if(QueuePool.getUserBasedQueue2().getSize() != 0)
+		{
+			for(int i = QueuePool.getUserBasedQueue2().first;i <= QueuePool.getUserBasedQueue2().last;i++)
+			{	
+				Process currentProcess=QueuePool.getUserBasedQueue2().getProcess(i);
+				Process nextProcess=QueuePool.getUserBasedQueue2().getProcess(i+1);
+
+				if(currentProcess.ArrivalTime == timerCounter)
+				{
+					currentProcess.ChangeState(State.READY);
+					if(QueuePool.RunningProcess==null||QueuePool.RunningProcess.Priority==Priority.P3) QueuePool.RunningProcess=currentProcess;
+					
+					if(nextProcess!=null&&nextProcess.ArrivalTime!=timerCounter)
+						break;
+				}
+			}
+		}
+		if(QueuePool.getUserBasedQueue3().getSize() != 0)
+		{
+			for(int i = QueuePool.getUserBasedQueue3().first;i <= QueuePool.getUserBasedQueue3().last;i++)
+			{	
+				Process currentProcess=QueuePool.getUserBasedQueue3().getProcess(i);
+				Process nextProcess=QueuePool.getUserBasedQueue3().getProcess(i+1);
+
+				if(currentProcess.ArrivalTime == timerCounter)
+				{
+					currentProcess.ChangeState(State.READY);
+					if(QueuePool.RunningProcess==null) QueuePool.RunningProcess=currentProcess;
+					
+					if(nextProcess!=null&&nextProcess.ArrivalTime!=timerCounter)
+						break;
+				}
+			}
+		}
+
+	}
+	
+	
+	private void CheckInterrupted() {
+		for (ProceessInterruptedModel item : QueuePool.getInterruptedProcesses()) {
+			if(timerCounter - item.InterruptedTime == 20)
+			{
+				switch(item.Priority)
+				{
+				case P2:
+				{
+					for(int i = 0; i < QueuePool.getUserBasedQueue2().getSize(); i++)
+					{
+						if(item.ProcessId == QueuePool.getUserBasedQueue2().getProcess(i).ProcessId)
+						{
+							Process newProcess = QueuePool.getUserBasedQueue2().getProcess(i);
+							newProcess.State = State.TERMINATED;
+							QueuePool.getUserBasedQueue2().change(i, newProcess);
+							newProcess.PrintTimeout();
+						}
+					}
+				}
+					break;
+				case P3:
+				{
+					for(int i = 0; i < QueuePool.getUserBasedQueue3().getSize(); i++)
+					{
+						if(item.ProcessId == QueuePool.getUserBasedQueue3().getProcess(i).ProcessId)
+						{
+							Process newProcess = QueuePool.getUserBasedQueue3().getProcess(i);
+							newProcess.State = State.TERMINATED;
+							QueuePool.getUserBasedQueue3().change(i, newProcess);
+							newProcess.PrintTimeout();
+						}
+					}
+				}
+					break;
+				
+				}
+			}
+		}
+	}
+	
+	private void ClearTerminated() {
+		
+		if(QueuePool.getUserBasedQueue2().getProcess(QueuePool.getUserBasedQueue2().first) != null && QueuePool.getUserBasedQueue2().getProcess(QueuePool.getUserBasedQueue2().first).State == State.TERMINATED)
+			QueuePool.getUserBasedQueue2().remove();
+		
+		if(QueuePool.getUserBasedQueue3().getProcess(QueuePool.getUserBasedQueue3().first) != null && QueuePool.getUserBasedQueue3().getProcess(QueuePool.getUserBasedQueue3().first).State == State.TERMINATED)
+			QueuePool.getUserBasedQueue3().remove();
+	}
+}

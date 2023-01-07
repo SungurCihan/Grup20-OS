@@ -1,0 +1,4 @@
+INDEX VERSION 1.131+C:\Users\nsc9\OneDrive\Masaüstü\BizimOdev\.metadata\.plugins\org.eclipse.jdt.core
+1865797976.index
+3959137331.index
+1223378278.index
